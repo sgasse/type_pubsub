@@ -2,7 +2,7 @@ use futures::{future::join_all, join};
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::time::sleep;
-use type_pubsub::{new_echo_client, TypeBroker};
+use type_pubsub::{new_echo_client, TypePubSub};
 
 #[derive(Debug, Clone)]
 pub struct ComposedType {
@@ -12,8 +12,8 @@ pub struct ComposedType {
 
 #[tokio::main]
 async fn main() {
-    // Create a TypeBroker
-    let broker = TypeBroker::default();
+    // Create a TypePubSub
+    let pubsub = TypePubSub::default();
 
     // Setup some simple echo clients for `usize` messages
     let (subscribers_usize, handles_usize): (Vec<_>, Vec<_>) = (1..=3)
@@ -24,32 +24,32 @@ async fn main() {
     // Setup an echo client for `ComposedType` messages
     let (tx_comp, handle_comp) = new_echo_client::<ComposedType>("comp_client");
 
-    // Subscribe clients to the broker
+    // Subscribe clients to the pubsub
     {
-        let mut broker_ = broker.write().await;
+        let mut pubsub_ = pubsub.write().await;
 
         for subscriber in subscribers_usize.into_iter() {
-            broker_.subscribe(subscriber);
+            pubsub_.subscribe(subscriber);
         }
-        broker_.subscribe(tx_comp);
+        pubsub_.subscribe(tx_comp);
     }
 
     // Setup usize sender
-    let broker_ = Arc::clone(&broker);
+    let pubsub_ = Arc::clone(&pubsub);
     let sender_usize_handle = tokio::spawn(async move {
         for i in 0..10 {
             {
                 println!("Sending i: {}", i);
-                let broker_ = broker_.read().await;
+                let pubsub_ = pubsub_.read().await;
 
-                broker_.publish(i as usize);
+                pubsub_.publish(i as usize);
 
                 let comp_type = ComposedType {
                     id: i,
                     name: format!("message{}", i),
                 };
 
-                broker_.publish(comp_type);
+                pubsub_.publish(comp_type);
             }
 
             sleep(Duration::from_secs(1)).await;
@@ -57,11 +57,11 @@ async fn main() {
     });
 
     // Setup ComposedType sender
-    let broker_ = Arc::clone(&broker);
+    let pubsub_ = Arc::clone(&pubsub);
     let sender_comp_handle = tokio::spawn(async move {
         for i in 0..6 {
             {
-                let broker_ = broker_.read().await;
+                let pubsub_ = pubsub_.read().await;
 
                 let comp_type = ComposedType {
                     id: i,
@@ -69,13 +69,23 @@ async fn main() {
                 };
                 println!("Sending: {:?}", &comp_type);
 
-                broker_.publish(comp_type);
+                pubsub_.publish(comp_type);
             }
 
             sleep(Duration::from_secs(2)).await;
         }
     });
 
+    // We want our echo clients to shut down once our sending tasks are done.
+    // To achieve this, we have to drop all sending ends of the channels.
+    // We can drop all references to the `TypePubSub`, thus the only living
+    // channel ends are in the sending tasks.
+    // Note that this could also be done implicitly by moving the main `pubsub`
+    // reference into the async block of the last task instead of cloning the
+    // Arc before.
+    drop(pubsub);
+
+    // Run all tasks in parallel
     let _ = join!(
         sender_usize_handle,
         sender_comp_handle,

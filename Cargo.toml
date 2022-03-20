@@ -2,6 +2,9 @@
 name = "type_pubsub"
 version = "0.1.0"
 edition = "2021"
+license-file = "LICENSE-APACHE"
+readme = "README.md"
+repository = "https://github.com/sgasse/type_pubsub"
 
 [lib]
 name = "type_pubsub"
