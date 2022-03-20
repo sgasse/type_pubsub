@@ -1,5 +1,6 @@
 [package]
 name = "type_pubsub"
+description = "Type-based publisher-subscriber broker written in Rust"
 version = "0.1.0"
 edition = "2021"
 license-file = "LICENSE-APACHE"
