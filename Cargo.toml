@@ -1,0 +1,21 @@
+[package]
+name = "type_pubsub"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+name = "type_pubsub"
+path = "src/lib.rs"
+
+[[bin]]
+name = "type_pubsub"
+path = "src/bin/type_pubsub.rs"
+
+[dependencies]
+futures = "0.3.21"
+tokio = { version = "1.0", features = [
+    "rt-multi-thread",
+    "macros",
+    "sync",
+    "time",
+] }
