@@ -16,23 +16,21 @@ async fn main() {
     let pubsub = TypePubSub::default();
 
     // Setup some simple echo clients for `usize` messages
-    let (subscribers_usize, handles_usize): (Vec<_>, Vec<_>) = (1..=3)
+    let handles_usize: Vec<_> = (1..=3)
         .into_iter()
-        .map(|num| new_echo_client::<usize>(&format!("usize_client_{}", num)))
-        .unzip();
+        .map(|num| (num, Arc::clone(&pubsub)))
+        .map(|(num, pubsub_)| async move {
+            let stream_usize = pubsub_.write().await.subscribe::<usize>();
+            new_echo_client(&format!("UsizeEcho{}", num), stream_usize)
+        })
+        .collect();
 
-    // Setup an echo client for `ComposedType` messages
-    let (tx_comp, handle_comp) = new_echo_client::<ComposedType>("comp_client");
-
-    // Subscribe clients to the pubsub
-    {
-        let mut pubsub_ = pubsub.write().await;
-
-        for subscriber in subscribers_usize.into_iter() {
-            pubsub_.subscribe(subscriber);
-        }
-        pubsub_.subscribe(tx_comp);
-    }
+    // Setup echo client for `ComposedType`
+    let stream_comp = Arc::clone(&pubsub)
+        .write()
+        .await
+        .subscribe::<ComposedType>();
+    let handle_comp = new_echo_client("CompEcho", stream_comp);
 
     // Setup usize sender
     let pubsub_ = Arc::clone(&pubsub);
