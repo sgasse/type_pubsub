@@ -36,7 +36,7 @@ impl TypePubSub {
         }))
     }
 
-    /// Subscribe to message type `T` by providing a sending channel end.
+    /// Subscribe to message type `T`.
     pub fn subscribe<T: Send + Sync + Clone + 'static>(&mut self) -> PubSubStream<T> {
         let (tx, rx) = mpsc::unbounded();
         let type_channels = self
